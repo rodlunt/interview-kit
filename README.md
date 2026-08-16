@@ -4,7 +4,18 @@
 
 No account. No install. No internet connection needed. Nothing you type ever leaves your computer.
 
-[**Download interview-kit.html**](https://github.com/rodlunt/interview-kit/raw/main/interview-kit.html) and open it in your browser. That is the whole setup.
+### [**Use it now**](https://rodlunt.github.io/interview-kit/interview-kit.html)
+
+Opens in your browser and works immediately. Nothing is installed and nothing you
+type is sent anywhere.
+
+### [**Or download a copy to keep**](https://github.com/rodlunt/interview-kit/releases/latest/download/interview-kit.html)
+
+One file. Save it, open it whenever, works with no internet at all.
+
+> **Do not use the "raw" link to the file in this repository.** GitHub serves it
+> as plain text, so your browser shows you a page of source code rather than the
+> tool. Use one of the two links above.
 
 ---
 
@@ -22,9 +33,10 @@ You are a founder, a researcher, a student, anyone who needs to talk to people a
 
 ### Step by step
 
-**Download the file.** Put it somewhere you will find it again. Your Desktop is fine.
-
-**Open it.** Double-click. It opens in your browser like a web page, except it is on your computer and it is not talking to anybody.
+**Open it.** Either [click here](https://rodlunt.github.io/interview-kit/interview-kit.html)
+and start straight away, or [download the file](https://github.com/rodlunt/interview-kit/releases/latest/download/interview-kit.html),
+put it somewhere you will find it again, and double-click it. Both are the same tool.
+The downloaded one keeps working with no internet.
 
 **Type your questions,** one per line, and press "Check my questions". It will flag things like:
 
