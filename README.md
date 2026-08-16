@@ -1,5 +1,12 @@
 # Interview Kit
 
+![CI](https://img.shields.io/github/actions/workflow/status/rodlunt/interview-kit/ci.yml?branch=main&label=ci)
+![Latest release](https://img.shields.io/github/v/release/rodlunt/interview-kit)
+![Licence](https://img.shields.io/github/license/rodlunt/interview-kit)
+![No dependencies](https://img.shields.io/badge/dependencies-none-1b7a4b)
+![No network](https://img.shields.io/badge/network%20requests-none-1b7a4b)
+![One file](https://img.shields.io/github/size/rodlunt/interview-kit/interview-kit.html?label=interview-kit.html)
+
 **One file. You interview someone, and they get to take back anything they said that they would rather you did not use.**
 
 No account. No install. No internet connection needed. Nothing you type ever leaves your computer.
@@ -82,11 +89,13 @@ There is nothing to install. It is one static HTML file.
 
 **Any web server, or none:**
 
-```bash
-git clone https://github.com/rodlunt/interview-kit.git
-cd interview-kit
-python3 -m http.server 8000
-# then open http://localhost:8000/interview-kit.html
+```console
+$ git clone https://github.com/rodlunt/interview-kit.git
+$ cd interview-kit
+$ python3 -m http.server 8000
+Serving HTTP on 0.0.0.0 port 8000 ...
+
+then open http://localhost:8000/interview-kit.html
 ```
 
 **Put it on a site you already have:** copy `interview-kit.html` anywhere it can be served. It has no dependencies, no build step at runtime, no external requests. It will work from a file share, a Dropbox link or an S3 bucket.
@@ -117,19 +126,34 @@ tests/                  browser and unit tests
 
 `questionkit/rules.json` is read by the Python module and injected into both HTML files at build time. Two hand-written copies of the same logic drift, and you find out when the two tools disagree in front of somebody.
 
-```bash
-python3 build_web.py           # rebuild both HTML files
-python3 build_web.py --check   # CI: fail if either is stale
+```console
+$ python3 build_web.py
+wrote question-critic.html: 11 rules, 15,445 bytes, self-contained
+wrote interview-kit.html: 11 rules, 32,002 bytes, self-contained
+
+$ python3 build_web.py --check
+question-critic.html is current (11 rules)
+interview-kit.html is current (11 rules)
 ```
 
 The check is not decoration. It was verified to catch drift by changing a threshold and watching it fail.
 
 ### Tests
 
-```bash
-python3 tests/test_critique.py                          # rules, no dependencies
-uv run --with playwright python tests/test_web_parity.py # python vs javascript agree
-uv run --with playwright python tests/test_kit_loop.py   # the whole loop, two people
+```console
+$ python3 tests/test_critique.py
+known-bad 10 | known-good 10 | contested 3
+score range   bad 20-80   good 95-100
+all checks passed
+
+$ uv run --with playwright python tests/test_web_parity.py
+compared 23 questions across both implementations
+all checks passed: web tool and python module agree exactly
+
+$ uv run --with playwright python tests/test_kit_loop.py
+PASS  interviewee file opens clean in a fresh browser [[]]
+PASS  answers file contains no interview content beyond ids [True]
+all checks passed
 ```
 
 `test_critique.py` holds three fixed groups: **known-bad** which must be caught, **known-good** which must not be, and **known-contested**, real questions from a working script that the critic flags anyway, recorded with the reason rather than tuned away. The good and bad groups must not overlap on score, so a critic that flags everything fails as loudly as one that flags nothing. That check earned its keep immediately: the first version of one rule flagged **78%** of a working script.
