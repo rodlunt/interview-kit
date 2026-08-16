@@ -1,0 +1,37 @@
+name: Bug report
+description: Something in the tool does not work
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Please do not paste real interview content. Nobody consented to it appearing
+        in a public issue, and a made-up example is almost always enough.
+  - type: input
+    id: browser
+    attributes:
+      label: Browser and operating system
+      placeholder: "Chrome 151 on Android 14, or Safari on iPhone"
+    validations: {required: true}
+  - type: dropdown
+    id: where
+    attributes:
+      label: Where were you
+      options:
+        - Writing questions
+        - Running an interview
+        - Writing up afterwards
+        - Sending the file to the interviewee
+        - I am the interviewee, opening a file someone sent me
+        - Reading their answers back
+    validations: {required: true}
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened, and what you expected instead
+    validations: {required: true}
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: "1. Opened the file\n2. Typed two questions\n3. Pressed..."

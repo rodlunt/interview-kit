@@ -1,0 +1,63 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# Read-only: this workflow checks out code and runs tests. It never writes back,
+# so it does not get permission to.
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Rules behave (hard gate)
+        run: python3 tests/test_critique.py
+
+      - name: Shipped HTML is not stale (hard gate)
+        # Both HTML files are GENERATED from questionkit/rules.json. A generated
+        # file nobody verifies is just a copy that has not drifted yet, and the
+        # drift shows up as the two tools disagreeing in front of a user.
+        run: python3 build_web.py --check
+
+      - name: The tool makes no network requests (hard gate)
+        # The entire promise of this project is that nothing leaves the browser.
+        # A CDN link or a stray fetch would break that silently, so it is a
+        # build failure rather than a code review question.
+        run: |
+          set -uo pipefail
+          if grep -nE '(https?:)?//[a-z0-9.-]+\.[a-z]{2,}|\bfetch\(|XMLHttpRequest|navigator\.sendBeacon' \
+               interview-kit.html question-critic.html; then
+            echo "ABORT: a network reference reached a shipped file (matches above)"
+            exit 1
+          fi
+          echo "OK: no network references in the shipped files"
+
+      - name: Install Chrome for the browser tests
+        uses: browser-actions/setup-chrome@v1
+        with:
+          chrome-version: stable
+
+      - name: Python and JavaScript agree (hard gate)
+        run: |
+          python3 -m pip install --quiet playwright
+          python3 -m playwright install --with-deps chromium
+          python3 tests/test_web_parity.py
+
+      - name: The whole loop works, as two people (hard gate)
+        run: python3 tests/test_kit_loop.py

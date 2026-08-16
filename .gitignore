@@ -1,0 +1,11 @@
+__pycache__/
+*.pyc
+.pytest_cache/
+.venv/
+.DS_Store
+
+# Interview material must never end up in this repo.
+answers-*.json
+review-for-*.html
+*.m4a
+*.wav

@@ -1,0 +1,197 @@
+<!doctype html>
+<html lang="en-AU">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Interview Question Critic</title>
+<style>
+  :root{--ink:#16202E;--dim:#5A6779;--line:#DDE3EC;--page:#fff;--panel:#F5F7FA;
+        --blue:#1F6FD0;--red:#B3261E;--amber:#B4740A;--green:#1B7A4B;}
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--page);color:var(--ink);font:17px/1.6 system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
+  .wrap{max-width:860px;margin:0 auto;padding:28px 18px 90px}
+  h1{font-size:28px;letter-spacing:-.01em}
+  h2{font-size:19px;margin-top:30px}
+  p{margin-top:12px}
+  .lede{color:var(--dim)}
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px 18px;margin-top:18px}
+  textarea{width:100%;min-height:190px;margin-top:10px;padding:13px;font:inherit;font-size:16px;
+           border:1px solid var(--line);border-radius:10px;resize:vertical;color:var(--ink);background:#fff}
+  textarea:focus,button:focus-visible{outline:2px solid var(--blue);outline-offset:1px}
+  .row{display:flex;gap:10px;flex-wrap:wrap;margin-top:12px}
+  button{font:inherit;font-weight:600;padding:11px 16px;border-radius:9px;border:1px solid var(--line);
+         background:#fff;color:var(--ink);cursor:pointer}
+  button.primary{background:var(--blue);color:#fff;border-color:var(--blue)}
+  .summary{display:flex;gap:22px;flex-wrap:wrap;margin-top:16px;padding:14px 16px;border:1px solid var(--line);border-radius:12px}
+  .stat b{display:block;font-size:26px;line-height:1.1}
+  .stat span{font-size:13px;color:var(--dim)}
+  .q{border:1px solid var(--line);border-left-width:5px;border-radius:10px;padding:14px 16px;margin-top:12px}
+  .q.fatal{border-left-color:var(--red)}
+  .q.warn{border-left-color:var(--amber)}
+  .q.note{border-left-color:var(--blue)}
+  .q.clean{border-left-color:var(--green)}
+  .qtext{font-weight:600}
+  .verdict{font-size:13px;color:var(--dim);margin-top:3px}
+  .f{margin-top:11px;padding-left:12px;border-left:2px solid var(--line)}
+  .f .lab{font-size:12px;font-weight:800;letter-spacing:.06em;text-transform:uppercase}
+  .f.fatal .lab{color:var(--red)} .f.warn .lab{color:var(--amber)} .f.note .lab{color:var(--blue)}
+  .f .why{font-size:14px;color:var(--dim);margin-top:3px}
+  .f .sug{font-size:14px;margin-top:5px}
+  .limits{margin-top:26px;font-size:14px;color:var(--dim);border-top:1px solid var(--line);padding-top:16px}
+  code{background:var(--panel);padding:1px 5px;border-radius:4px;font-size:14px}
+  @media(max-width:520px){body{font-size:16px}h1{font-size:23px}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Interview Question Critic</h1>
+  <p class="lede">Paste the questions you plan to ask, one per line. This tells you which ones will produce
+  answers you cannot use, before you spend an hour of someone else's time finding out.</p>
+
+  <div class="panel">
+    <strong>It runs entirely in this page.</strong>
+    <p>No account, no internet connection, no data sent anywhere. Save this file and it keeps working offline.
+    Your questions never leave your browser.</p>
+  </div>
+
+  <textarea id="input" spellcheck="true" aria-label="Your interview questions, one per line"
+    placeholder="Walk me through how you handle that today.&#10;Would you use a tool that fixed this?&#10;How much would you pay for it?"></textarea>
+
+  <div class="row">
+    <button class="primary" id="run">Check my questions</button>
+    <button id="example">Load an example</button>
+    <button id="clear">Clear</button>
+    <button id="export" hidden>Download for the interview runner</button>
+  </div>
+
+  <div id="out"></div>
+
+  <div class="limits">
+    <strong>What this cannot do.</strong> <span id="limits"></span>
+    <p>Choosing <em>what</em> to ask about is the harder half, and it comes from writing down what you
+    believe and then designing a question that could prove you wrong. This tool only checks how the
+    question is put.</p>
+  </div>
+</div>
+
+<script>
+"use strict";
+/* Rules are injected from questionkit/rules.json at build time. Do not edit them
+   here: this block is regenerated, and CI fails if it drifts from the source. */
+const SPEC = /*__RULES_JSON__*/null;
+
+const $ = id => document.getElementById(id);
+const SEV_ORDER = {fatal:0, warn:1, note:2};
+const esc = s => String(s??"").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+
+$("limits").textContent = SPEC.limits;
+
+const ANCHOR_RE = new RegExp(SPEC.rules.find(r => r.name === "no-past-anchor").pattern, "i");
+
+const compiled = SPEC.rules.map(r => ({
+  spec: r,
+  re: r.pattern ? new RegExp(r.pattern, "i") : null
+}));
+
+function sentences(t){ return t.trim().split(/(?<=\?)\s+/).filter(s => s.trim()); }
+
+function critique(text){
+  const q = text.trim();
+  const findings = [], deferred = [];
+  if(!q) return {question:q, findings:[{rule:"empty",severity:"fatal",message:"Empty question.",why:"Nothing to ask.",suggestion:""}], score:0, fatal:true};
+
+  for(const {spec, re} of compiled){
+    let hit = false, span = "";
+    if(spec.kind === "regex"){
+      const m = q.match(re); hit = !!m; span = m ? m[0].trim() : "";
+    } else if(spec.kind === "regex_absent"){
+      hit = !re.test(q);
+    } else if(spec.kind === "multi_sentence"){
+      const n = sentences(q).length; hit = n > 1; span = n + " sentences";
+    } else if(spec.kind === "word_count"){
+      const n = q.split(/\s+/).length; hit = n > spec.threshold; span = n + " words";
+    }
+    if(!hit) continue;
+    const f = {rule:spec.name, severity:spec.severity,
+               message: spec.message + (span ? ": “"+span+"”." : "."),
+               why: spec.why, suggestion: spec.suggestion || ""};
+    (spec.skip_if_fatal ? deferred : findings).push(f);
+  }
+  const fatal = findings.some(f => f.severity === "fatal");
+  if(!fatal) findings.push(...deferred);
+  findings.sort((a,b) => SEV_ORDER[a.severity] - SEV_ORDER[b.severity]);
+  const score = Math.max(0, 100 - findings.reduce((s,f) => s + SPEC.severity_penalty[f.severity], 0));
+  return {question:q, findings, score, fatal};
+}
+
+function render(){
+  const lines = $("input").value.split("\n").map(s => s.trim()).filter(Boolean);
+  const out = $("out");
+  out.innerHTML = "";
+  $("export").hidden = lines.length === 0;
+  if(!lines.length) return;
+
+  const crits = lines.map(critique);
+  const fatal = crits.filter(c => c.fatal).length;
+  const clean = crits.filter(c => !c.findings.length).length;
+  // Test the pattern directly, not the absence of the flag: no-past-anchor is
+  // suppressed on already-fatal questions, so inferring it counted every
+  // hypothetical as "anchored" and reported 6 of 7 when the true answer was 2.
+  const anchored = lines.filter(q => ANCHOR_RE.test(q)).length;
+  const mean = Math.round(crits.reduce((s,c) => s + c.score, 0) / crits.length);
+
+  const sum = document.createElement("div");
+  sum.className = "summary";
+  sum.innerHTML =
+    `<div class="stat"><b>${lines.length}</b><span>questions</span></div>` +
+    `<div class="stat"><b style="color:${fatal?'var(--red)':'var(--green)'}">${fatal}</b><span>will waste the interview</span></div>` +
+    `<div class="stat"><b>${anchored}</b><span>anchored in what happened</span></div>` +
+    `<div class="stat"><b>${clean}</b><span>with nothing flagged</span></div>` +
+    `<div class="stat"><b>${mean}</b><span>mean score</span></div>`;
+  out.appendChild(sum);
+
+  crits.forEach((c, i) => {
+    const worst = c.findings.length ? c.findings[0].severity : "clean";
+    const el = document.createElement("div");
+    el.className = "q " + worst;
+    let html = `<div class="qtext">${i+1}. ${esc(c.question)}</div>`;
+    html += `<div class="verdict">${c.findings.length ? "score " + c.score : "Nothing flagged. That means it is well put, not necessarily worth asking."}</div>`;
+    for(const f of c.findings){
+      html += `<div class="f ${f.severity}"><div class="lab">${f.severity} &middot; ${esc(f.rule)}</div>` +
+              `<div>${esc(f.message)}</div><div class="why">${esc(f.why)}</div>` +
+              (f.suggestion ? `<div class="sug"><strong>Try:</strong> ${esc(f.suggestion)}</div>` : "") + `</div>`;
+    }
+    el.innerHTML = html;
+    out.appendChild(el);
+  });
+}
+
+$("run").onclick = render;
+$("clear").onclick = () => { $("input").value = ""; render(); };
+$("example").onclick = () => {
+  $("input").value = [
+    "Would you use a tool that did all of this for you?",
+    "How much would you pay for it?",
+    "Don't you think the current way is frustrating?",
+    "On a scale of 1 to 10, how painful is it?",
+    "Walk me through how you handle that today.",
+    "Tell me about the last time it went wrong. What happened?",
+    "What have you tried to fix it?"
+  ].join("\n");
+  render();
+};
+$("export").onclick = () => {
+  const items = $("input").value.split("\n").map(s => s.trim()).filter(Boolean)
+    .map(t => ({type:"question", text:t}));
+  const blob = new Blob([JSON.stringify({sections:[{title:"Section 1", items}]}, null, 1)],
+                        {type:"application/json"});
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = "interview-script.json";
+  a.click();
+  URL.revokeObjectURL(a.href);
+};
+$("input").addEventListener("input", () => { if($("out").children.length) render(); });
+</script>
+</body>
+</html>

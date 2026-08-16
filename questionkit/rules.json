@@ -1,0 +1,122 @@
+{
+  "_comment": [
+    "THE single source of truth for the question critic. Both the Python module",
+    "and the shipped single-file web tool read this, and CI fails if the HTML's",
+    "embedded copy has fallen out of step.",
+    "",
+    "It is a data file rather than code in each language because the same rules",
+    "in two hand-written implementations drift, quietly, and you find out when",
+    "the two tools disagree in front of a founder. The runner in this repo",
+    "already carries that hazard with its embedded SCRIPTS block; no reason to",
+    "add a second one.",
+    "",
+    "kinds:",
+    "  regex          fires when the pattern matches",
+    "  regex_absent   fires when the pattern does NOT match",
+    "  multi_sentence fires when the text holds more than one sentence-ending ?",
+    "  word_count     fires above 'threshold' words"
+  ],
+  "severity_penalty": { "fatal": 40, "warn": 15, "note": 5 },
+  "rules": [
+    {
+      "name": "hypothetical",
+      "kind": "regex",
+      "severity": "fatal",
+      "pattern": "\\b(would you|would your|could you see yourself|do you think you('d| would)|if (?:you|we|there) (?:were|was|had|could)|imagine if|hypothetically|in future would|will you ever)\\b",
+      "message": "Asks what they WOULD do",
+      "why": "People are cheerfully, sincerely wrong about their own future behaviour. A yes here costs them nothing and tells you nothing.",
+      "suggestion": "Ask what they did instead: “When did you last hit that problem, and what did you do?”"
+    },
+    {
+      "name": "pitching",
+      "kind": "regex",
+      "severity": "fatal",
+      "pattern": "\\b(our (?:product|app|platform|tool|solution|software)|we(?:'re| are) building|we(?:'ve| have) built|my (?:product|app|startup|idea)|what do you think of (?:this|our|my)|does this sound|would this be useful|how much would you pay for (?:this|it|our))\\b",
+      "message": "Pitches instead of asking",
+      "why": "The moment they know what you want to hear, you stop getting data and start getting politeness. You cannot un-ring that bell for the rest of the interview.",
+      "suggestion": "Describe nothing. Ask how they handle the problem today and what it costs them."
+    },
+    {
+      "name": "leading",
+      "kind": "regex",
+      "severity": "fatal",
+      "pattern": "\\b(don't you (?:think|agree|find)|wouldn't you|isn't it (?:true|frustrating|annoying)|surely|obviously|as you know|i(?:'m| am) sure you|how (?:frustrating|annoying|painful) is)\\b",
+      "message": "Leads the witness",
+      "why": "You have supplied the answer inside the question. Whatever comes back is yours, not theirs.",
+      "suggestion": "Strip the judgement out and let them supply it, or not."
+    },
+    {
+      "name": "scale",
+      "kind": "regex",
+      "severity": "warn",
+      "pattern": "\\b(on a scale (?:of|from)|rate (?:it|this) (?:out of|from))\\b",
+      "message": "Asks for a rating",
+      "why": "A 7 out of 10 is not a finding. It compresses the one thing you came for, which is the reason behind the number.",
+      "suggestion": "Ask for the reason directly, and the last occasion it applied."
+    },
+    {
+      "name": "closed",
+      "kind": "regex",
+      "severity": "warn",
+      "pattern": "^\\s*(do|does|did|is|are|was|were|have|has|had|can|could|will|would|should|if)\\b",
+      "message": "Opens with a word that invites yes or no",
+      "why": "Closed questions get closed answers, and a one-word answer is a dead end you then have to dig out of.",
+      "suggestion": "Start with what, how, when or “walk me through”."
+    },
+    {
+      "name": "double-barrelled",
+      "kind": "regex",
+      "severity": "warn",
+      "pattern": ",?\\s+\\b(?:and|or)\\s+(?=(?:what|how|why|when|who|which|where)\\b)",
+      "message": "Two asks joined in one sentence",
+      "why": "They answer whichever half is easier and you will not notice the other went missing.",
+      "suggestion": "Split them. The runner shows one item per screen for exactly this reason."
+    },
+    {
+      "name": "jargon",
+      "kind": "regex",
+      "severity": "warn",
+      "pattern": "\\b(synerg\\w+|leverage|value[- ]add|paradigm|holistic|ecosystem play|digital transformation|best[- ]in[- ]class|seamless(?:ly)?|frictionless)\\b",
+      "message": "Business jargon",
+      "why": "It either means nothing to them or signals that you are selling. Both cost you candour.",
+      "suggestion": "Say it the way they would say it to a colleague."
+    },
+    {
+      "name": "absolute",
+      "kind": "regex",
+      "severity": "note",
+      "pattern": "\\b(always|never|everyone|nobody|all of your|every single)\\b",
+      "message": "Absolute term",
+      "why": "Invites a correction rather than an account, and people argue with the word instead of answering.",
+      "suggestion": "Ask about a specific recent instance instead."
+    },
+    {
+      "name": "multi-part",
+      "kind": "multi_sentence",
+      "severity": "note",
+      "message": "More than one sentence in a single item",
+      "why": "Fine if the later ones are follow-up probes you ask after the first is answered. A problem only if they are separate topics competing for one answer.",
+      "suggestion": "If they are separate topics, split them into their own items."
+    },
+    {
+      "name": "long",
+      "kind": "word_count",
+      "threshold": 45,
+      "severity": "note",
+      "message": "Long question",
+      "why": "By the end they are answering the last clause and have forgotten the first.",
+      "suggestion": "Cut it to the one thing you actually want to know."
+    },
+    {
+      "name": "no-past-anchor",
+      "kind": "regex_absent",
+      "severity": "note",
+      "skip_if_fatal": true,
+      "pattern": "\\b(last time|walk me through|tell me about (?:a|the) time|what happened|how do you currently|how did you|when did you last|what did you|show me|the last (?:time|one|job|week|month))\\b",
+      "message": "Not anchored to something that actually happened",
+      "why": "Questions grounded in a real past event get specifics; ungrounded ones get opinions, and opinions are the cheapest thing a person can give you.",
+      "suggestion": "Consider anchoring it: “the last time…”, “walk me through…”, “what happened when…”."
+    }
+  ],
+  "limits": "These rules check HOW a question is asked, never WHETHER it is worth asking. A script can pass every rule and still probe nothing that matters."
+}

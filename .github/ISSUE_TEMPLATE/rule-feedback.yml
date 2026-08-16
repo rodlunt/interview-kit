@@ -1,0 +1,27 @@
+name: The question checker got it wrong
+description: A good question it flagged, or a bad question it missed
+labels: ["rules"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        This is the most useful thing you can report. The checker is only worth
+        having if it is right often enough to be trusted.
+  - type: textarea
+    id: question
+    attributes:
+      label: The question, exactly as you typed it
+    validations: {required: true}
+  - type: dropdown
+    id: direction
+    attributes:
+      label: Which way did it get it wrong
+      options:
+        - It flagged a question that is actually fine
+        - It missed a question that will get useless answers
+    validations: {required: true}
+  - type: textarea
+    id: why
+    attributes:
+      label: Why you think so
+      placeholder: "Ideally: what answer did it actually get you when you asked it?"
