@@ -228,14 +228,33 @@ let S = {who:"", promise:"", themEmail:"", myEmail:"", questions:[], run:null, c
 function save(){ try{ localStorage.setItem(LS, JSON.stringify(S)); }catch(e){} }
 function load(){ try{ const r=localStorage.getItem(LS); if(r) S=Object.assign(S,JSON.parse(r)); }catch(e){} }
 
+/* The return address is the only field that decides whether the loop closes, so
+   it gets checked rather than trusted. Deliberately loose: this rejects an empty
+   box and an obvious typo like a missing @, and does not try to decide whether a
+   real mailbox exists, which no regex can do. */
+function emailish(v){ return /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test((v||"").trim()); }
+
 /* Hand a file to the operating system's share sheet where that exists, which on
    a phone means the founder or interviewee taps once and the file is attached to
    whatever app they choose. Everywhere else, download it and open a prefilled
    email that NAMES the file, because a page cannot attach anything to a mailto
    and cannot know where the browser put the download. Saying "attach the file"
-   without naming it is how people end up sending an empty email. */
+   without naming it is how people end up sending an empty email.
+
+   ALWAYS SAVE A COPY FIRST, on every path. navigator.share() resolves when the
+   receiving app accepts the file, never when it is delivered, and some transports
+   cannot carry it at all: an iPhone sharing a .json to an Android number goes out
+   as MMS, which drops the attachment. This is not hypothetical; it has cost a real
+   set of answers. Without a local
+   copy the interviewee is left with nothing to retry from but browser storage that
+   may not survive, which makes the person doing you a favour worst off of the three
+   paths. A stray file in their downloads is a far better failure.
+
+   Saved BEFORE the share, not after, because a download started after an await is
+   outside the user gesture that began this and iOS can refuse it. */
 async function shareOrDownload(name, text, type, mail){
   const file = new File([text], name, {type});
+  download(name, text, type);
   if (navigator.canShare && navigator.canShare({files:[file]})) {
     try {
       await navigator.share({files:[file], title: mail.subject, text: mail.body});
@@ -244,7 +263,6 @@ async function shareOrDownload(name, text, type, mail){
       if (e && e.name === "AbortError") return "cancelled";   // they backed out; not a failure
     }
   }
-  download(name, text, type);
   const q = (o) => Object.entries(o).filter(([,v])=>v)
       .map(([k,v])=>k+"="+encodeURIComponent(v)).join("&");
   const body = mail.body + "\n\n[ Attach the file " + name + ", which has just been saved to your "
@@ -275,9 +293,9 @@ function viewQuestions(){
     <input id="who" type="text" placeholder="e.g. Sam, Acme Plumbing" value="${esc(S.who)}">
     <label class="fld" for="promise">What did you promise them? (they will see this, quote yourself)</label>
     <textarea id="promise" style="min-height:80px" placeholder="e.g. This is not a sales call, nothing goes public, and you can strike anything you like.">${esc(S.promise)}</textarea>
-    <label class="fld" for="them">Their email (so the reply comes back to the right place)</label>
+    <label class="fld" for="them">Their email (where you send the notes)</label>
     <input id="them" type="text" placeholder="e.g. sam@acmeplumbing.com.au" value="${esc(S.themEmail||"")}">
-    <label class="fld" for="mine">Your email</label>
+    <label class="fld" for="mine">Your email (where their answers come back to)</label>
     <input id="mine" type="text" placeholder="you@example.com" value="${esc(S.myEmail||"")}">
     <label class="fld" for="qs">Your questions, one per line</label>
     <textarea id="qs" style="min-height:220px" placeholder="Walk me through how you handle that today.&#10;Tell me about the last time it went wrong.">${esc(S.questions.join("\n"))}</textarea>
@@ -393,7 +411,15 @@ async function exportReviewFile(share){
   // Write out a copy of THIS page with the payload filled in. That is what makes
   // the interviewee's file self-contained: no server, no tool, no instructions
   // beyond "open this".
-  const payload = {who:S.who, promise:S.promise, replyTo:S.myEmail,
+  //
+  // Refuse without a return address. A file exported with an empty replyTo hands
+  // the interviewee a mailto with no To: line, and on the share-sheet path no
+  // address at all, so they do the work and it goes nowhere. Both sides get a
+  // normal-looking confirmation, which is how it stayed invisible for weeks.
+  // The check reads the same value that is about to be embedded, one line below,
+  // so nothing can move between validating and using it.
+  if(!emailish(S.myEmail)) return "no-reply-address";
+  const payload = {who:S.who, promise:S.promise, replyTo:S.myEmail.trim(),
                    created:new Date().toISOString().slice(0,10),
                    claims:S.claims.map(c=>({id:c.id,text:c.text,at:c.at}))};
   let src = "<!doctype html>\n" + document.documentElement.outerHTML;
@@ -424,18 +450,38 @@ function viewSend(){
       Open the attached file in your browser, tick anything you would rather I did not use, then press
       "Save my answers" and email me the file it creates. You do not need to give a reason.</blockquote>
       <button id="cp">Copy that wording</button></div>
+    <div class="box ${emailish(S.myEmail)?"":"warn"}" id="rbox">
+      <strong>Their answers come back to</strong>
+      <p class="small">This is written into the file they get. Without it their page cannot
+      address the reply, and you will never hear back.</p>
+      <input id="reply" type="text" placeholder="you@example.com" value="${esc(S.myEmail||"")}"></div>
     <div class="row"><button class="primary" id="send">Send it to them</button>
       <button id="again">Just download the file</button>
       <button id="read">I have their answers, read them</button></div>
     <p class="small" id="how"></p>
     <p class="small">Their answers come back as a file. Nothing is sent anywhere by either of you.</p>`;
   $("cp").onclick=async()=>{ try{ await navigator.clipboard.writeText($("w").innerText.trim()); $("cp").textContent="Copied"; }catch(e){ $("cp").textContent="Select the text above"; } };
+  /* Gate the two export buttons on the address, and keep S in step with the box
+     so the value the guard passed is the value that gets embedded. */
+  const gate=()=>{ const ok=emailish($("reply").value);
+    S.myEmail=$("reply").value.trim(); save();
+    $("rbox").className = "box" + (ok?"":" warn");
+    ["send","again"].forEach(id=>{ $(id).disabled=!ok; });
+    if(!ok) $("how").innerHTML = "<strong>Add your email above first.</strong> "
+      + "Everything else is ready; the file just has nowhere to reply to.";
+    else if($("how").innerText.startsWith("Add your email")) $("how").innerHTML="";
+  };
+  $("reply").addEventListener("input", gate); gate();
   $("send").onclick=async()=>{ const how=await exportReviewFile(true);
-    $("how").innerHTML = how==="shared" ? "<strong>Shared.</strong>"
-      : how==="cancelled" ? "Not sent."
+    $("how").innerHTML = how==="shared"
+        ? "<strong>Handed to your share sheet.</strong> A copy is saved on this device too, "
+          + "so if it does not reach them you can attach that one."
+      : how==="cancelled" ? "Not sent, but the file is saved on this device."
+      : how==="no-reply-address" ? "<strong>Not sent.</strong> Add your email above first."
       : "<strong>Saved and your email opened.</strong> Attach the file it names before sending.";
   };
-  $("again").onclick=()=>exportReviewFile(false);
+  $("again").onclick=async()=>{ const how=await exportReviewFile(false);
+    if(how==="no-reply-address") $("how").innerHTML="<strong>Not saved.</strong> Add your email above first."; };
   $("read").onclick=viewRead;
 }
 
@@ -486,10 +532,11 @@ function viewReview(){
   if(p.promise) h+=`<div class="box info"><strong>What you were told</strong><blockquote>${esc(p.promise)}</blockquote></div>`;
   h+=`<div class="box"><strong>Nothing here is sent anywhere.</strong>
       <p>This file runs entirely on your own computer. When you are done you press a button, it saves a small
-      file, and you email that back. Nobody else sees it on the way.</p></div><div id="cl"></div>
+      file, and you email that back${p.replyTo?" to <strong>"+esc(p.replyTo)+"</strong>":""}. Nobody else
+      sees it on the way.</p></div><div id="cl"></div>
       <h2>Anything else</h2><textarea id="gen" placeholder="Anything you want to add or correct."></textarea>
       <div class="row"><button class="primary" id="dl">Save my answers</button></div>
-      <p class="small" id="st">Email the file this creates back to whoever sent you this.</p>`;
+      <p class="small" id="st">Email the file this creates ${p.replyTo?"to "+esc(p.replyTo):"back to whoever sent you this"}.</p>`;
   $("wrap").innerHTML=h;
   const box=$("cl");
   (p.claims||[]).forEach((c,i)=>{
@@ -512,18 +559,25 @@ function viewReview(){
   $("dl").onclick=async()=>{
     const out={who:p.who, saved:new Date().toISOString(), claims:A.claims, general:A.general};
     const safe=(p.who||"answers").replace(/[^a-z0-9]+/gi,"-").toLowerCase();
+    const fname=`answers-${safe}.json`;
     const n=Object.values(A.claims).filter(v=>v.flagged).length;
-    const how=await shareOrDownload(`answers-${safe}.json`, JSON.stringify(out,null,1),
+    const how=await shareOrDownload(fname, JSON.stringify(out,null,1),
       "application/json", {
         to: p.replyTo,
         subject: "My answers on the interview notes",
         body: "Here are my answers"+(n?", I have marked "+n+" thing(s) I would rather you did not use":"")+"."});
+    /* The share sheet has no To: field, so naming the address is the only thing
+       telling them who to pick out of their own contacts. */
+    const dest = p.replyTo ? " to <strong>"+esc(p.replyTo)+"</strong>" : "";
     $("st").innerHTML = how==="shared"
-      ? "<strong>Sent.</strong> You can change anything and send again."
+      ? "<strong>Handed to your share sheet.</strong> Make sure it goes"+(dest||" to whoever sent you this")
+        + ". If it does not arrive, <strong>"+esc(fname)+"</strong> has also been saved on this device "
+        + "and you can email that copy instead."
       : how==="cancelled"
-        ? "Not sent. Press the button again when you are ready."
+        ? "Not sent, but <strong>"+esc(fname)+"</strong> is saved on this device. "
+          + "Press the button again when you are ready."
         : "<strong>Saved.</strong> Your email should have opened. Attach the file it names, "
-          + "which is in your downloads, and send. You can change anything and save again.";
+          + "which is in your downloads, and send"+dest+". You can change anything and save again.";
   };
 }
 

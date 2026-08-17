@@ -166,6 +166,34 @@ When you export, the kit writes out **a copy of itself** with the interview embe
 
 The answers file coming back carries **only claim ids, ticks and notes**, never the interview content.
 
+### Getting the answers back, and what happens when that fails
+
+Two things exist because both of them went wrong in real use.
+
+**The send step will not let you export without your own email address.** It is
+written into the file the interviewee gets, and without it their page has no
+address to reply to: their email opens with a blank To: line, and on a phone
+share sheet there is no recipient field at all. They do the work, press the
+button, and it goes nowhere while both ends show a normal confirmation.
+
+**Every send also saves a copy on the sender's device, on both legs.** A browser
+cannot attach a file to an email, so the kit hands it to the share sheet where
+one exists. `navigator.share()` resolves when the receiving app *accepts* the
+file, never when it is delivered, and some transports cannot carry it: an iPhone
+sharing a `.json` to an Android number goes out as MMS, which drops the
+attachment silently. Without a local copy the interviewee is left with nothing
+to retry from, which makes the person doing you a favour the worst off of
+everyone. A stray file in their downloads is a far better failure.
+
+The copy is saved *before* the share sheet opens, because a download started
+after an `await` is outside the user gesture and iOS can refuse it.
+
+`tests/test_kit_loop.py` covers both. It starts its run with the address field
+blank and asserts the export is refused, and it stubs the share sheet to succeed
+and asserts the local copy is still written. Point it at an older build with
+`KIT=/path/to/old.html` and those checks fail, which is the only reason to
+believe them.
+
 ### Adding or changing a rule
 
 Edit `questionkit/rules.json`, add cases to `tests/test_critique.py`, run `build_web.py`, commit the regenerated HTML. Four rule kinds are supported: `regex`, `regex_absent`, `multi_sentence`, `word_count`. A rule that fires on good questions is worse than no rule, so add a known-good case that must keep passing.
