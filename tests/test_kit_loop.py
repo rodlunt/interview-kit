@@ -23,6 +23,12 @@ KIT = Path(os.environ.get("KIT") or Path(__file__).resolve().parent.parent / "in
 CHROME = "/usr/bin/google-chrome"
 fails = []
 
+MAILTO_HOOK = ("window.__mailtoHook = (u) => { window.__mailtoSeen = u; };")
+"""Capture the mailto instead of letting Chrome hand it to the real mail client.
+Headless Chromium has no share sheet, so every run takes the mailto branch and
+would otherwise open a compose window on the machine running the suite."""
+
+
 
 def check(name, expected, actual):
     if expected == actual:
@@ -42,6 +48,7 @@ def main():
 
         # ---------- founder ----------
         ctx = b.new_context(accept_downloads=True, viewport={"width": 400, "height": 860})
+        ctx.add_init_script(MAILTO_HOOK)
         pg = ctx.new_page()
         errs = []
         pg.on("pageerror", lambda e: errs.append(str(e)))
@@ -117,6 +124,7 @@ def main():
 
         # ---------- interviewee, fresh browser, own storage ----------
         ctx2 = b.new_context(accept_downloads=True, viewport={"width": 390, "height": 844})
+        ctx2.add_init_script(MAILTO_HOOK)
         pg2 = ctx2.new_page()
         errs2 = []
         pg2.on("pageerror", lambda e: errs2.append(str(e)))
@@ -148,6 +156,10 @@ def main():
         check("answers file carries the general comment", "Otherwise all fine.", a["general"])
         check("answers file contains no interview content beyond ids", True,
               "shared calendar" not in answers.read_text())
+        check("the return address reaches the mail step", True,
+              "founder%40example.com" in (pg2.evaluate("() => window.__mailtoSeen") or ""))
+        check("no mailto escaped to the desktop mail client", True,
+              pg2.evaluate("() => typeof window.__mailtoHook === 'function'"))
 
         # ---------- CONTROL: a successful share must still leave a copy ----------
         # navigator.share() resolves when the receiving app ACCEPTS the file, not

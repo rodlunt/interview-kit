@@ -142,7 +142,15 @@ async function shareOrDownload(name, text, type, mail){
       .map(([k,v])=>k+"="+encodeURIComponent(v)).join("&");
   const body = mail.body + "\n\n[ Attach the file " + name + ", which has just been saved to your "
              + "downloads. It will not attach itself. ]";
-  location.href = "mailto:" + encodeURIComponent(mail.to||"") + "?" + q({subject:mail.subject, body});
+  const url = "mailto:" + encodeURIComponent(mail.to||"") + "?" + q({subject:mail.subject, body});
+  /* Indirection so a test can capture the mailto instead of handing it to the
+     operating system. Without it, every run of tests/test_kit_loop.py opens a real
+     compose window on the machine running the suite, because headless Chromium has
+     no share sheet and therefore always takes this branch. It also lets the test
+     assert the recipient, which is the thing that broke in the first place and was
+     never covered. Nothing sets this hook in normal use. */
+  if (typeof window.__mailtoHook === "function") window.__mailtoHook(url);
+  else location.href = url;
   return "downloaded";
 }
 
