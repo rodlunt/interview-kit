@@ -13,12 +13,21 @@ anything it inherited from the founder's session would show up as a failure here
 rather than in front of a real interviewee.
 """
 import json
+import os
 import sys
 from pathlib import Path
 
-KIT = Path(__file__).resolve().parent.parent / "interview-kit.html"
+# Overridable so the checks can be pointed at an older build and watched to fail.
+# A control nobody has seen fail is not evidence of anything.
+KIT = Path(os.environ.get("KIT") or Path(__file__).resolve().parent.parent / "interview-kit.html")
 CHROME = "/usr/bin/google-chrome"
 fails = []
+
+MAILTO_HOOK = ("window.__mailtoHook = (u) => { window.__mailtoSeen = u; };")
+"""Capture the mailto instead of letting Chrome hand it to the real mail client.
+Headless Chromium has no share sheet, so every run takes the mailto branch and
+would otherwise open a compose window on the machine running the suite."""
+
 
 
 def check(name, expected, actual):
@@ -39,6 +48,7 @@ def main():
 
         # ---------- founder ----------
         ctx = b.new_context(accept_downloads=True, viewport={"width": 400, "height": 860})
+        ctx.add_init_script(MAILTO_HOOK)
         pg = ctx.new_page()
         errs = []
         pg.on("pageerror", lambda e: errs.append(str(e)))
@@ -50,7 +60,9 @@ def main():
         pg.fill("#who", "Sam, Acme Plumbing")
         pg.fill("#promise", "Not a sales call, nothing goes public, strike anything you like.")
         pg.fill("#them", "sam@acmeplumbing.com.au")
-        pg.fill("#mine", "founder@example.com")
+        # Deliberately leave "Your email" blank. That is the state that shipped a
+        # reviewer file with no return address in real use, so the run starts
+        # broken and has to be stopped at the send step.
         pg.fill("#qs", "Walk me through how you handle that today.\n"
                        "Tell me about the last time it went wrong. What happened?\n"
                        "Would you use a tool that did all of this for you?")
@@ -73,6 +85,29 @@ def main():
         check("write-up seeded from the notes", 3, pg.locator(".claim").count())
         pg.click("#mk")
         pg.wait_for_selector("#again")
+
+        # CONTROL: no return address, no export. Both of these fail on the
+        # pre-fix page, which exported happily and produced a file whose
+        # interviewee copy had nothing to reply to.
+        check("send is blocked with no return address", True, pg.locator("#send").is_disabled())
+        check("download is blocked with no return address", True, pg.locator("#again").is_disabled())
+        # ...and the refusal is in the export itself, not only in the disabled
+        # button, so it holds for any caller that reaches the function directly.
+        check("export refuses with no return address", "no-reply-address",
+              pg.evaluate("() => exportReviewFile(false)"))
+        check("and it says why", True, "Add your email" in pg.locator("#how").inner_text())
+
+        check("send screen offers a return-address field", 1, pg.locator("#reply").count())
+        if not pg.locator("#reply").count():
+            # Pre-fix build. Stop here rather than timing out on a field that
+            # does not exist: the controls above have already reported.
+            print("\nno #reply field, stopping (this is the pre-fix page)")
+            print("FAILURES: " + ", ".join(fails))
+            b.close()
+            return 1
+        pg.fill("#reply", "founder@example.com")
+        check("filling it in releases the gate", False, pg.locator("#send").is_disabled())
+
         with pg.expect_download() as d:
             pg.click("#again")         # explicit download path (no share sheet in headless)
         review_file = dl / "review.html"
@@ -89,6 +124,7 @@ def main():
 
         # ---------- interviewee, fresh browser, own storage ----------
         ctx2 = b.new_context(accept_downloads=True, viewport={"width": 390, "height": 844})
+        ctx2.add_init_script(MAILTO_HOOK)
         pg2 = ctx2.new_page()
         errs2 = []
         pg2.on("pageerror", lambda e: errs2.append(str(e)))
@@ -100,6 +136,10 @@ def main():
         check("shows the promise back to them", True,
               "nothing goes public" in pg2.locator("blockquote").inner_text())
         check("does NOT show the founder's tools", 0, pg2.locator("#qs").count())
+        # The share sheet has no To: line, so the page naming the address is the
+        # only thing that tells them who to send it to.
+        check("names where the answers go", True,
+              "founder@example.com" in pg2.locator("#wrap").inner_text())
 
         pg2.locator(".claim").nth(1).locator("input[type=checkbox]").check()
         pg2.locator(".claim").nth(1).locator("textarea").fill("Rather you left that one out.")
@@ -116,6 +156,38 @@ def main():
         check("answers file carries the general comment", "Otherwise all fine.", a["general"])
         check("answers file contains no interview content beyond ids", True,
               "shared calendar" not in answers.read_text())
+        check("the return address reaches the mail step", True,
+              "founder%40example.com" in (pg2.evaluate("() => window.__mailtoSeen") or ""))
+        check("no mailto escaped to the desktop mail client", True,
+              pg2.evaluate("() => typeof window.__mailtoHook === 'function'"))
+
+        # ---------- CONTROL: a successful share must still leave a copy ----------
+        # navigator.share() resolves when the receiving app ACCEPTS the file, not
+        # when it is delivered. An iPhone sharing this .json to an Android number
+        # goes out as MMS, which drops the attachment, and the page says it worked.
+        # Headless Chromium has no share sheet, so it is stubbed to succeed: that
+        # is exactly the path that used to skip the local save and leave the
+        # interviewee with nothing to retry from.
+        from playwright.sync_api import TimeoutError as PWTimeout
+        ctx3 = b.new_context(accept_downloads=True, viewport={"width": 390, "height": 844})
+        ctx3.add_init_script(
+            "Object.defineProperty(navigator,'canShare',{value:()=>true,configurable:true});"
+            "Object.defineProperty(navigator,'share',{value:async()=>{window.__shared=true;},"
+            "configurable:true});")
+        pg3 = ctx3.new_page()
+        pg3.goto(review_file.as_uri())
+        pg3.wait_for_selector(".claim")
+        pg3.locator(".claim").nth(0).locator("input[type=checkbox]").check()
+        try:
+            with pg3.expect_download(timeout=5000) as d3:
+                pg3.click("#dl")
+            saved = d3.value.suggested_filename
+        except PWTimeout:
+            saved = None
+        check("share path took the share sheet", True, pg3.evaluate("() => !!window.__shared"))
+        check("a successful share STILL saves a local copy", "answers-sam-acme-plumbing.json", saved)
+        check("and the page says where that copy is", True,
+              "saved on this device" in pg3.locator("#st").inner_text())
 
         # ---------- back to the founder ----------
         pg.click("#read")
