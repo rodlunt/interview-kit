@@ -24,6 +24,33 @@ One file. Save it, open it whenever, works with no internet at all.
 > as plain text, so your browser shows you a page of source code rather than the
 > tool. Use one of the two links above.
 
+## Screenshots
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/images/question-check-dark.png">
+    <img src="docs/images/question-check.png" width="70%" alt="Interview Kit's question checker flagging a hypothetical question as fatal and a closed question as a warning, alongside two clean, well-anchored questions">
+  </picture>
+</p>
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/images/interview-run-dark.png">
+    <img src="docs/images/interview-run.png" width="31%" alt="The interview screen mid-conversation, showing the running clock, the current question, and a notes box for what was said">
+  </picture>
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/images/write-up-dark.png">
+    <img src="docs/images/write-up.png" width="31%" alt="The write-up screen where interview notes become plain statements the interviewee will be asked to review">
+  </picture>
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/images/take-back-dark.png">
+    <img src="docs/images/take-back.png" width="31%" alt="The interviewee's review page with one point ticked 'do not use this' and a note explaining why, ready to send back">
+  </picture>
+</p>
+
+Captured from the real app at a desktop viewport with seeded example data; each image adapts to
+GitHub's light or dark theme.
+
 ---
 
 ## 1. Just want to use it
@@ -47,7 +74,7 @@ The downloaded one keeps working with no internet.
 
 **Type your questions,** one per line, and press "Check my questions". It will flag things like:
 
-> **FATAL · HYPOTHETICAL** — Asks what they WOULD do.
+> **FATAL · HYPOTHETICAL**: Asks what they WOULD do.
 > People are cheerfully, sincerely wrong about their own future behaviour. A yes here costs them nothing and tells you nothing.
 > **Try:** "When did you last hit that problem, and what did you do?"
 
