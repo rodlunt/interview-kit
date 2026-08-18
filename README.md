@@ -234,3 +234,7 @@ For people who would rather send a link than an attachment:
 Apache 2.0. See [LICENSE](LICENSE) and [NOTICE](NOTICE).
 
 The question rules encode the discipline described in **The Mom Test** by Rob Fitzpatrick: you learn from what people have done, and lose nothing but time asking what they would do. The implementation is original, the idea is his, and the book is worth your afternoon.
+
+---
+
+<sub>Built by [Rodney Lunt](https://rod.lunt.au). If this saved you some time, you can [buy me a coffee](https://buymeacoffee.com/rodlunt).</sub>
