@@ -2,6 +2,12 @@
 
 <!-- What changes, and what problem it solves. -->
 
+Closes #
+
+## Verification
+
+<!-- The artefact that proves it works: a test file, a manual check, an output you compared. -->
+
 ## Checklist
 
 - [ ] If I changed a rule, I edited `questionkit/rules.json` and nothing else

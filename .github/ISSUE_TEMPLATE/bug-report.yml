@@ -35,3 +35,15 @@ body:
     attributes:
       label: Steps to reproduce
       placeholder: "1. Opened the file\n2. Typed two questions\n3. Pressed..."
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+      description: >-
+        Two or three testable criteria. Done means these pass, not "finished
+        typing".
+      placeholder: |
+        1. Opening the file no longer shows the error
+        2. The steps above complete without the browser console logging anything
+        3. tests/test_kit_loop.py still passes
+    validations: {required: true}

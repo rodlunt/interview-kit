@@ -1,0 +1,31 @@
+name: Feature request
+description: Concrete work that has already been agreed, not an open idea
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        For an open idea or a "what if", use Discussions instead. This form is for
+        work that is ready to be built.
+  - type: textarea
+    id: what
+    attributes:
+      label: What should change
+    validations: {required: true}
+  - type: textarea
+    id: why
+    attributes:
+      label: Why it is needed
+    validations: {required: true}
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+      description: >-
+        Two or three testable criteria. Done means these pass, not "finished
+        typing".
+      placeholder: |
+        1. The new option appears in the interview screen and can be toggled
+        2. tests/test_critique.py covers the new behaviour
+        3. python3 build_web.py --check still passes
+    validations: {required: true}
