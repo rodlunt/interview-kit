@@ -3,9 +3,13 @@ name: ci
 on:
   push:
     branches: [main]
+  # Deliberately unfiltered: every pull request is checked, whatever it targets.
+  # With `branches: [main]` here, a PR stacked on another branch ran no checks
+  # at all, and GitHub still reported it mergeable with mergeStateStatus CLEAN
+  # and an empty statusCheckRollup. Not a missing check that looks missing, a
+  # missing check that looks like a pass. The push trigger stays main-only:
+  # this only needs to widen for pull requests.
   pull_request:
-    branches: [main]
-
 # Read-only: this workflow checks out code and runs tests. It never writes back,
 # so it does not get permission to.
 permissions:
